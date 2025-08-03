@@ -60,11 +60,11 @@
         return;
       }
 
-      // 2) Flux "code" via exchangeCodeForSession
+      // 2) Flux "code" via exchangeCodeForSession (PKCE)
       if (code) {
         stateEl.textContent = 'Validation du lien…';
         try {
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession({ code });
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession({ auth_code: code });
           if (exchangeError) {
             stateEl.textContent = `Impossible de valider le lien : ${exchangeError.message}`;
             return;
