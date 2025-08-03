@@ -60,12 +60,12 @@
         return;
       }
 
-      // 2) Flux "code" via verifyOtp
+      // 2) Flux code via exchangeCodeForSession
       if (code) {
         stateEl.textContent = 'Validation du lien…';
-        const { error: verifyError } = await supabase.auth.verifyOtp({ token: code, type: 'recovery' });
-        if (verifyError) {
-          stateEl.textContent = `Impossible de valider le lien : ${verifyError.message}`;
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          stateEl.textContent = `Impossible de valider le lien : ${exchangeError.message}`;
           return;
         }
         stateEl.textContent = 'Entrez votre nouveau mot de passe.';
