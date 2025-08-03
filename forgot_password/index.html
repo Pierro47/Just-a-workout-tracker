@@ -1,126 +1,107 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Réinitialiser le mot de passe</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 8vh auto; padding: 0 16px; }
-    form { display: grid; gap: 12px; margin-top: 16px; }
-    input { padding: 10px; font-size: 16px; }
-    button { padding: 10px; font-size: 16px; cursor: pointer; }
-    .hidden { display: none; }
-    .msg { margin-top: 12px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réinitialisation de mot de passe</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; display: flex; height: 100vh; align-items: center; justify-content: center; }
+        .container { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h1 { font-size: 1.5rem; margin-bottom: 1rem; text-align: center; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; }
+        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+        button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background: #007BFF; color: #fff; font-size: 1rem; cursor: pointer; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
+        .message { margin-top: 1rem; text-align: center; }
+        .error { color: #d9534f; }
+        .success { color: #28a745; }
+    </style>
 </head>
 <body>
-  <h1>Définir un nouveau mot de passe</h1>
-  <div id="state"></div>
+    <div class="container">
+        <h1>Réinitialiser votre mot de passe</h1>
+        <form id="reset-form">
+            <!-- Email et token sont extraits de l'URL -->
+            <input type="hidden" id="email" name="email">
+            <input type="hidden" id="token" name="token">
 
-  <form id="reset-form" class="hidden">
-    <input id="pwd1" type="password" placeholder="Nouveau mot de passe" required minlength="8">
-    <input id="pwd2" type="password" placeholder="Confirmer le mot de passe" required minlength="8">
-    <button type="submit">Mettre à jour</button>
-  </form>
+            <div class="form-group">
+                <label for="new-password">Nouveau mot de passe</label>
+                <input type="password" id="new-password" name="new_password" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirmer le mot de passe</label>
+                <input type="password" id="confirm-password" name="confirm_password" required minlength="8">
+            </div>
+            <button type="submit" id="submit-btn">Valider</button>
+            <div class="message" id="message"></div>
+        </form>
+    </div>
 
-  <div id="msg" class="msg"></div>
+    <script>
+        // Récupérer email et token depuis la query string
+        const params = new URLSearchParams(window.location.search);
+        const emailParam = params.get('email');
+        const tokenParam = params.get('token');
+        const emailInput = document.getElementById('email');
+        const tokenInput = document.getElementById('token');
+        const messageEl = document.getElementById('message');
 
-  <script type="module">
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-    // Remplace par tes valeurs Supabase
-    const SUPABASE_URL = 'https://fdwaaelwmlgpbhjwfyfk.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkd2FhZWx3bWxncGJoandmeWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0Nzg1NDUsImV4cCI6MjA2ODA1NDU0NX0.ZWe_omDe6E5bS6xZPjN2NBHeqDp3I6TG1WTISqX_Ye4';
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // DEBUG logs
-    console.log('href:', window.location.href);
-    console.log('search:', window.location.search);
-    console.log('hash:', window.location.hash);
-
-    const stateEl = document.getElementById('state');
-    const formEl = document.getElementById('reset-form');
-    const msgEl = document.getElementById('msg');
-    const pwd1El = document.getElementById('pwd1');
-    const pwd2El = document.getElementById('pwd2');
-
-    async function bootstrap() {
-      const url = new URL(window.location.href);
-      const params = url.searchParams;
-      const code = params.get('code');
-      const errorParam = params.get('error') || params.get('error_description');
-      const hashParams = new URLSearchParams(window.location.hash.slice(1));
-      const access_token = hashParams.get('access_token');
-      const refresh_token = hashParams.get('refresh_token');
-
-      // 1) Gestion des erreurs explicites
-      if (errorParam) {
-        stateEl.textContent = `Erreur : ${decodeURIComponent(errorParam)}. Demande un nouveau lien.`;
-        return;
-      }
-
-      // 2) Flux code via exchangeCodeForSession
-      if (code) {
-        stateEl.textContent = 'Validation du lien…';
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeError) {
-          stateEl.textContent = `Impossible de valider le lien : ${exchangeError.message}`;
-          return;
+        if (!emailParam || !tokenParam) {
+            document.querySelector('.container').innerHTML = '<p class="error">Lien invalide ou incomplet.</p>';
+        } else {
+            emailInput.value = emailParam;
+            tokenInput.value = tokenParam;
         }
-        stateEl.textContent = 'Entrez votre nouveau mot de passe.';
-        formEl.classList.remove('hidden');
-        return;
-      }
 
-      // 3) Flux PKCE (fragment) fallback
-      if (access_token && refresh_token) {
-        stateEl.textContent = 'Validation du lien…';
-        const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
-        if (sessionError) {
-          stateEl.textContent = `Impossible de valider le lien : ${sessionError.message}`;
-          return;
-        }
-        stateEl.textContent = 'Entrez votre nouveau mot de passe.';
-        formEl.classList.remove('hidden');
-        return;
-      }
+        document.getElementById('reset-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            messageEl.textContent = '';
+            messageEl.className = 'message';
 
-      // 4) Lien invalide ou expiré
-      stateEl.innerHTML = `Lien invalide ou expiré.<br/><button id="resend">Renvoyer un e-mail</button>`;
-      document.getElementById('resend').onclick = async () => {
-        const email = prompt('Entrez votre email :');
-        if (email) {
-          await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
-          stateEl.textContent = 'Un nouveau lien a été envoyé.';
-        }
-      };
-    }
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
 
-    formEl.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      msgEl.textContent = '';
-      const p1 = pwd1El.value.trim();
-      const p2 = pwd2El.value.trim();
-      if (p1.length < 8) {
-        msgEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.';
-        return;
-      }
-      if (p1 !== p2) {
-        msgEl.textContent = 'Les mots de passe ne correspondent pas.';
-        return;
-      }
-      const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
-      if (updateError) {
-        msgEl.textContent = `Erreur : ${updateError.message}`;
-        return;
-      }
-      await supabase.auth.signOut();
-      msgEl.textContent = 'Mot de passe mis à jour. Vous pouvez maintenant vous connecter.';
-      formEl.classList.add('hidden');
-    });
+            if (newPassword !== confirmPassword) {
+                messageEl.textContent = 'Les mots de passe ne correspondent pas.';
+                messageEl.classList.add('error');
+                return;
+            }
 
-    bootstrap();
-  </script>
+            const payload = {
+                email: emailInput.value,
+                token: tokenInput.value,
+                new_password: newPassword,
+                confirm_password: confirmPassword
+            };
+
+            document.getElementById('submit-btn').disabled = true;
+
+            try {
+                const response = await fetch('/api/v1/auth/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    messageEl.textContent = 'Votre mot de passe a été mis à jour avec succès.';
+                    messageEl.classList.add('success');
+                } else {
+                    messageEl.textContent = result.message || 'Erreur lors de la réinitialisation.';
+                    messageEl.classList.add('error');
+                }
+            } catch (error) {
+                messageEl.textContent = 'Impossible de contacter le serveur.';
+                messageEl.classList.add('error');
+            } finally {
+                document.getElementById('submit-btn').disabled = false;
+            }
+        });
+    </script>
 </body>
 </html>
