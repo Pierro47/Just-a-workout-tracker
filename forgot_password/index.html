@@ -27,33 +27,45 @@
     <div id="message" class="message"></div>
   </div>
 
-  <!-- Supabase JS -->
+  <!-- Supabase JS v2 UMD -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
   <script>
     (async () => {
       const msgEl = document.getElementById('message');
-      // 1. Récupération du token et de l'email
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('token');
-      const email = params.get('email');
+      const form  = document.getElementById('reset-form');
 
-      if (!token || !email) {
-        msgEl.textContent = 'Lien invalide ou incomplet.';
+      // 1. Récupérer le token de récupération
+      const params = new URLSearchParams(window.location.search);
+      const token  = params.get('token');
+      console.log('🔑 token =', token);
+
+      if (!token) {
+        msgEl.textContent = 'Lien invalide ou expiré.';
         msgEl.classList.add('error');
-        document.getElementById('reset-form').style.display = 'none';
+        form.style.display = 'none';
         return;
       }
 
-      // 2. Initialisation Supabase
-      const SUPABASE_URL = 'https://fdwaaelwmlgpbhjwfyfk.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkd2FhZWx3bWxncGJoandmeWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0Nzg1NDUsImV4cCI6MjA2ODA1NDU0NX0.ZWe_omDe6E5bS6xZPjN2NBHeqDp3I6TG1WTISqX_Ye4';
-      const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+      // 2. Initialiser Supabase
+      const SUPABASE_URL     = 'https://fdwaaelwmlgpbhjwfyfk.supabase.co';
+      const SUPABASE_ANON_KEY= 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkd2FhZWx3bWxncGJoandmeWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0Nzg1NDUsImV4cCI6MjA2ODA1NDU0NX0.ZWe_omDe6E5bS6xZPjN2NBHeqDp3I6TG1WTISqX_Ye4';
+      const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      // 3. Gestion du submit
-      document.getElementById('reset-form').addEventListener('submit', async e => {
+      // 3. Vérifier le token avant d’afficher le formulaire
+      const { error: verifyError } = await supabase.auth.verifyOtp({ token, type: 'recovery' });
+      if (verifyError) {
+        console.error('verifyOtp error', verifyError);
+        msgEl.textContent = 'Token invalide ou expiré : ' + verifyError.message;
+        msgEl.classList.add('error');
+        form.style.display = 'none';
+        return;
+      }
+
+      // 4. Gestion de la soumission
+      form.addEventListener('submit', async e => {
         e.preventDefault();
         msgEl.textContent = '';
-        const pwd = document.getElementById('password').value;
+        const pwd  = document.getElementById('password').value;
         const pwd2 = document.getElementById('confirm-password').value;
 
         if (pwd !== pwd2) {
@@ -62,11 +74,9 @@
           return;
         }
 
-        // 4. Appel à l’API Supabase pour mettre à jour le mot de passe
-        const { data, error } = await supabase.auth.api.updateUser(
-          token,
-          { password: pwd }
-        );
+        // 5. Mettre à jour le mot de passe
+        const { data, error } = await supabase.auth.updateUser({ password: pwd });
+        console.log('updateUser response', { data, error });
 
         if (error) {
           msgEl.textContent = 'Erreur : ' + error.message;
@@ -74,7 +84,7 @@
         } else {
           msgEl.textContent = 'Mot de passe mis à jour ! Vous pouvez maintenant vous connecter.';
           msgEl.classList.add('success');
-          document.getElementById('reset-form').reset();
+          form.reset();
         }
       });
     })();
