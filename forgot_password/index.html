@@ -1,1 +1,123 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Réinitialiser le mot de passe</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 8vh auto; padding: 0 16px; }
+    form { display: grid; gap: 12px; margin-top: 16px; }
+    input { padding: 10px; font-size: 16px; }
+    button { padding: 10px; font-size: 16px; cursor: pointer; }
+    .hidden { display: none; }
+    .msg { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Définir un nouveau mot de passe</h1>
+  <div id="state"></div>
 
+  <form id="reset-form" class="hidden">
+    <input id="pwd1" type="password" placeholder="Nouveau mot de passe" required minlength="8">
+    <input id="pwd2" type="password" placeholder="Confirmer le mot de passe" required minlength="8">
+    <button type="submit">Mettre à jour</button>
+  </form>
+
+  <div id="msg" class="msg"></div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    // TODO: remplace par tes valeurs
+    const SUPABASE_URL = 'https://fdwaaelwmlgpbhjwfyfk.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkd2FhZWx3bWxncGJoandmeWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0Nzg1NDUsImV4cCI6MjA2ODA1NDU0NX0.ZWe_omDe6E5bS6xZPjN2NBHeqDp3I6TG1WTISqX_Ye4';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // --- Utilitaires
+    function parseFragment() {
+      // Les liens "recovery" arrivent sous forme de fragment: #access_token=...&refresh_token=...&type=recovery
+      const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+      const params = new URLSearchParams(hash);
+      return {
+        access_token: params.get('access_token'),
+        refresh_token: params.get('refresh_token'),
+        type: params.get('type'),
+        error: params.get('error_description') || params.get('error')
+      };
+    }
+
+    const stateEl = document.getElementById('state');
+    const formEl = document.getElementById('reset-form');
+    const msgEl = document.getElementById('msg');
+    const pwd1El = document.getElementById('pwd1');
+    const pwd2El = document.getElementById('pwd2');
+
+    async function bootstrap() {
+      const { access_token, refresh_token, type, error } = parseFragment();
+
+      if (error) {
+        stateEl.textContent = `Erreur du lien: ${error}`;
+        return;
+      }
+      if (!access_token || !refresh_token) {
+  stateEl.innerHTML = `Lien invalide ou expiré.<br/>Demande un nouvel e-mail de réinitialisation.`;
+  return;
+}
+
+
+      stateEl.textContent = 'Validation du lien…';
+
+      // 1) Crée la session temporaire avec les tokens du lien
+      const { data, error: setErr } = await supabase.auth.setSession({
+        access_token,
+        refresh_token
+      });
+      if (setErr) {
+        stateEl.textContent = `Impossible de valider le lien : ${setErr.message}`;
+        return;
+      }
+
+      // 2) Affiche le formulaire
+      stateEl.textContent = 'Entrez votre nouveau mot de passe.';
+      formEl.classList.remove('hidden');
+    }
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msgEl.textContent = '';
+
+      const p1 = pwd1El.value.trim();
+      const p2 = pwd2El.value.trim();
+
+      if (p1.length < 8) {
+        msgEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.';
+        return;
+      }
+      if (p1 !== p2) {
+        msgEl.textContent = 'Les mots de passe ne correspondent pas.';
+        return;
+      }
+
+      // 3) Met à jour le mot de passe via la session "recovery"
+      const { data, error } = await supabase.auth.updateUser({ password: p1 });
+      if (error) {
+        msgEl.textContent = `Erreur : ${error.message}`;
+        return;
+      }
+
+      // 4) (Optionnel) on ferme la session "recovery"
+      await supabase.auth.signOut();
+
+      msgEl.textContent = 'Mot de passe mis à jour. Vous pouvez maintenant vous connecter.';
+      formEl.classList.add('hidden');
+
+      // Option : rediriger vers ta page de login web / mobile deeplink
+      // window.location.assign('https://app.example.com/login');
+      // ou un deeplink mobile : window.location.assign('io.supabase.flutterquickstart://login-callback/');
+    });
+
+    bootstrap();
+  </script>
+</body>
+</html>
