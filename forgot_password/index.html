@@ -64,7 +64,7 @@
       if (code) {
         stateEl.textContent = 'Validation du lien…';
         try {
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession({ code });
           if (exchangeError) {
             stateEl.textContent = `Impossible de valider le lien : ${exchangeError.message}`;
             return;
