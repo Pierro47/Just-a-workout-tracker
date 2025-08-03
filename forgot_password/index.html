@@ -34,8 +34,9 @@
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // DEBUG: afficher URL et fragment
+    // DEBUG logs
     console.log('href:', window.location.href);
+    console.log('search:', window.location.search);
     console.log('hash:', window.location.hash);
 
     const stateEl = document.getElementById('state');
@@ -46,25 +47,30 @@
 
     async function bootstrap() {
       const url = new URL(window.location.href);
-      const search = url.searchParams;
-      const code = search.get('code');
-      const errorQuery = search.get('error') || search.get('error_description');
+      const searchParams = url.searchParams;
+      const code = searchParams.get('code');
+      const errorQuery = searchParams.get('error') || searchParams.get('error_description');
       const hashParams = new URLSearchParams(window.location.hash.slice(1));
       const access_token = hashParams.get('access_token');
       const refresh_token = hashParams.get('refresh_token');
 
-      // 1) Erreurs explicites
+      // 1) Gestion des erreurs explicites
       if (errorQuery) {
-        stateEl.textContent = `Erreur : ${decodeURIComponent(errorQuery)}. Demande un nouveau lien.`;
+        stateEl.textContent = `Erreur : ${decodeURIComponent(errorQuery)}. Demande un nouveau lien.`;
         return;
       }
 
-      // 2) Flux OTP via code
+      // 2) Flux "code" via exchangeCodeForSession
       if (code) {
-        stateEl.textContent = 'Vérification du lien…';
-        const { error: verifyError } = await supabase.auth.verifyOtp({ token: code, type: 'recovery' });
-        if (verifyError) {
-          stateEl.textContent = `Impossible de vérifier le lien : ${verifyError.message}`;
+        stateEl.textContent = 'Validation du lien…';
+        try {
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            stateEl.textContent = `Impossible de valider le lien : ${exchangeError.message}`;
+            return;
+          }
+        } catch (e) {
+          stateEl.textContent = `Erreur lors de la validation du lien : ${e.message}`;
           return;
         }
         stateEl.textContent = 'Entrez votre nouveau mot de passe.';
@@ -72,12 +78,12 @@
         return;
       }
 
-      // 3) Flux PKCE fragment fallback
+      // 3) Flux PKCE (fragment) fallback
       if (access_token && refresh_token) {
         stateEl.textContent = 'Validation du lien…';
         const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
         if (setErr) {
-          stateEl.textContent = `Impossible de valider le lien : ${setErr.message}`;
+          stateEl.textContent = `Impossible de valider le lien : ${setErr.message}`;
           return;
         }
         stateEl.textContent = 'Entrez votre nouveau mot de passe.';
@@ -88,11 +94,13 @@
       // 4) Lien invalide ou expiré
       stateEl.innerHTML = `Lien invalide ou expiré.<br/><button id="resend">Renvoyer un e-mail</button>`;
       document.getElementById('resend').onclick = async () => {
-        await supabase.auth.resetPasswordForEmail(
-          prompt('Entrez votre email:'),
-          { redirectTo: 'https://pierro47.github.io/Just-a-workout-tracker/forgot_password/' }
-        );
-        stateEl.textContent = 'Un nouveau lien a été envoyé.';
+        const email = prompt('Entrez votre email :');
+        if (email) {
+          await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: 'https://pierro47.github.io/Just-a-workout-tracker/forgot_password/'
+          });
+          stateEl.textContent = 'Un nouveau lien a été envoyé.';
+        }
       };
     }
 
@@ -111,7 +119,7 @@
       }
       const { error } = await supabase.auth.updateUser({ password: p1 });
       if (error) {
-        msgEl.textContent = `Erreur : ${error.message}`;
+        msgEl.textContent = `Erreur : ${error.message}`;
         return;
       }
       await supabase.auth.signOut();
