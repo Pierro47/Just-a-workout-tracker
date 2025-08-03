@@ -34,6 +34,10 @@
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    
+    console.log('href:', window.location.href);
+    console.log('hash:', window.location.hash);
+
     // --- Utilitaires
     function parseFragment() {
       // Les liens "recovery" arrivent sous forme de fragment: #access_token=...&refresh_token=...&type=recovery
